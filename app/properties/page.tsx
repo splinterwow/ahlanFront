@@ -17,14 +17,12 @@ export default function PropertiesPage() {
   const [loading, setLoading] = useState(true)
   const [accessToken, setAccessToken] = useState(null)
 
-  // API so‘rovlar uchun umumiy header
   const getAuthHeaders = () => ({
     "Accept": "application/json",
     "Content-Type": "application/json",
     "Authorization": `Bearer ${accessToken}`,
   })
 
-  // Tokenni faqat client-side’da olish
   useEffect(() => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("access_token")
@@ -32,24 +30,13 @@ export default function PropertiesPage() {
     }
   }, [])
 
-  // Obyektlar ro‘yxatini olish
-  useEffect(() => {
-    if (accessToken === null) return; // Token hali yuklanmagan bo‘lsa kutamiz
+  const fetchAllObjects = async (url = "https://ahlanapi.cdpos.uz/objects/") => {
+    let allObjects = []
+    let nextUrl = url
 
-    if (!accessToken) {
-      toast({
-        title: "Xatolik",
-        description: "Tizimga kirish talab qilinadi",
-        variant: "destructive",
-      })
-      router.push("/login")
-      return
-    }
-
-    const fetchObjects = async () => {
-      setLoading(true)
-      try {
-        const response = await fetch("https://ahlanapi.cdpos.uz/objects/", {
+    try {
+      while (nextUrl) {
+        const response = await fetch(nextUrl, {
           method: "GET",
           headers: getAuthHeaders(),
         })
@@ -62,8 +49,33 @@ export default function PropertiesPage() {
         }
 
         const data = await response.json()
-        const objectsList = data.results || []
-        setObjects(objectsList)
+        allObjects = [...allObjects, ...(data.results || [])]
+        nextUrl = data.next
+      }
+      return allObjects
+    } catch (error) {
+      throw error
+    }
+  }
+
+  useEffect(() => {
+    if (accessToken === null) return
+
+    if (!accessToken) {
+      toast({
+        title: "Xatolik",
+        description: "Tizimga kirish talab qilinadi",
+        variant: "destructive",
+      })
+      router.push("/login")
+      return
+    }
+
+    const loadObjects = async () => {
+      setLoading(true)
+      try {
+        const allObjects = await fetchAllObjects()
+        setObjects(allObjects)
         setLoading(false)
       } catch (error) {
         toast({
@@ -86,7 +98,7 @@ export default function PropertiesPage() {
       }
     }
 
-    fetchObjects()
+    loadObjects()
   }, [accessToken, router])
 
   if (loading) {
